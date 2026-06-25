@@ -10,7 +10,7 @@ import uuid
 
 from sqlalchemy import CheckConstraint, SmallInteger, String
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
 
@@ -34,6 +34,9 @@ class Patient(Base, TimestampMixin):
     age: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     gender: Mapped[str] = mapped_column(String(20), nullable=False)
     contact_number: Mapped[str] = mapped_column(String(20), nullable=False)
+    intake_records: Mapped[list["IntakeRecord"]] = relationship(
+        "IntakeRecord", back_populates="patient", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         CheckConstraint("age >= 0 AND age <= 130", name="ck_patient_age"),

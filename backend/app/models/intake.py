@@ -20,9 +20,10 @@ import uuid
 from sqlalchemy import Boolean, CheckConstraint, Float, ForeignKey, String, Text
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
+from app.models.patient import Patient
 
 
 # ---------------------------------------------------------------------------
@@ -80,6 +81,7 @@ class IntakeRecord(Base, TimestampMixin):
         ForeignKey("patients.id", ondelete="CASCADE"),
         nullable=False,
     )
+    patient: Mapped[Patient] = relationship("Patient", back_populates="intake_records")
     symptoms_text: Mapped[str] = mapped_column(Text, nullable=False)
 
     # ------------------------------------------------------------------
@@ -129,7 +131,7 @@ class IntakeRecord(Base, TimestampMixin):
         ),
         CheckConstraint(
             "char_length(symptoms_text) <= 2000",
-            name="ck_symptoms_length",
+            name="ck_symptoms_text_length",
         ),
     )
 
