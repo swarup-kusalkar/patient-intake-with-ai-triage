@@ -1,14 +1,6 @@
-"""
-app/services/triage_service.py — AI Triage Service.
+"""app/services/triage_service.py — AI Triage Service.
 
-STUB: Rule engine skeleton only. Full pipeline (LLM call, validation,
-retry, fallback) implemented in Phase 3.
-
-Architecture: This is an internal service module, not inline route logic.
-It has its own failure modes (LLM timeout, malformed JSON, rate limiting)
-that are unrelated to "save a patient record." Isolating it lets the
-route handler treat it as a plain typed function call — no exceptions
-about external APIs ever expected to bubble up.
+Full pipeline (Phase 3): rule engine -> LLM -> validation -> retry -> fallback.
 """
 from __future__ import annotations
 
@@ -17,20 +9,6 @@ from typing import Optional
 
 from app.models.intake import Department, TriageSource, UrgencyLevel
 
-# ---------------------------------------------------------------------------
-# Red-flag keyword map: keyword → (urgency, department)
-#
-# These are hand-maintained, deterministic, and trusted without further
-# validation — you wrote the keyword map, its output space is fully under
-# your control by construction.
-#
-# Key design principle: the rule engine runs BEFORE the LLM, not after.
-# For cases where being wrong matters most (cardiac arrest, stroke, etc.),
-# we don't want to depend on a probabilistic model at all.
-#
-# Honest caveat: this list is not exhaustive. The override log (Phase 4)
-# is the data that would surface missing terms over time.
-# ---------------------------------------------------------------------------
 RED_FLAG_KEYWORDS: dict[str, tuple[str, str]] = {
     "chest pain": ("urgent", "emergency"),
     "chest tightness": ("urgent", "emergency"),
@@ -52,17 +30,12 @@ RED_FLAG_KEYWORDS: dict[str, tuple[str, str]] = {
     "allergic reaction severe": ("urgent", "emergency"),
 }
 
-# Pre-computed sets for O(1) membership checks at validate time
 ALLOWED_DEPARTMENTS: frozenset[str] = frozenset(d.value for d in Department)
 ALLOWED_URGENCY: frozenset[str] = frozenset(u.value for u in UrgencyLevel)
 
 
 @dataclass
 class TriageSuggestion:
-    """
-    Result of a triage analysis — returned by the service, never persisted
-    until the receptionist confirms Save.
-    """
     source: TriageSource
     urgency: UrgencyLevel
     department: Department
@@ -71,14 +44,7 @@ class TriageSuggestion:
 
 
 def _rule_engine_check(symptoms_text: str) -> Optional[TriageSuggestion]:
-    """
-    Check symptoms text against red-flag keywords.
-
-    Case-insensitive substring match. Returns a TriageSuggestion immediately
-    on first match, skipping the LLM entirely.
-
-    Returns None if no red-flag keywords are found — caller proceeds to LLM.
-    """
+    """Case-insensitive substring match. Returns immediately on first match."""
     text_lower = symptoms_text.lower()
     for keyword, (urgency, department) in RED_FLAG_KEYWORDS.items():
         if keyword in text_lower:
@@ -86,34 +52,71 @@ def _rule_engine_check(symptoms_text: str) -> Optional[TriageSuggestion]:
                 source=TriageSource.rule_engine,
                 urgency=UrgencyLevel(urgency),
                 department=Department(department),
-                confidence=None,   # Rule engine: deterministic, not probabilistic
-                reasoning=None,    # No reasoning needed — keyword is self-evident
+                confidence=None,
+                reasoning=None,
             )
     return None
 
 
+def validate_llm_output(raw: dict) -> Optional[TriageSuggestion]:
+    """
+    Validate LLM JSON output against allowed enums and clamp confidence to [0, 1].
+
+    Layer 3 of four-layer validation (Section 6.3): application-level enum check.
+    """
+    try:
+        urgency_str = raw.get("urgency")
+        department_str = raw.get("department")
+        confidence = raw.get("confidence")
+        reasoning = raw.get("reasoning")
+
+        if urgency_str not in ALLOWED_URGENCY:
+            return None
+        if department_str not in ALLOWED_DEPARTMENTS:
+            return None
+
+        if confidence is not None:
+            try:
+                confidence = max(0.0, min(1.0, float(confidence)))
+            except (TypeError, ValueError):
+                confidence = 0.0
+
+        return TriageSuggestion(
+            source=TriageSource.llm,
+            urgency=UrgencyLevel(urgency_str),
+            department=Department(department_str),
+            confidence=confidence,
+            reasoning=reasoning,
+        )
+    except (TypeError, ValueError, KeyError):
+        return None
+
+
 async def analyze(symptoms_text: str) -> Optional[TriageSuggestion]:
     """
-    STUB: Full pipeline will be implemented in Phase 3.
+    Full triage pipeline (Section 6):
 
-    Phase 0: Rule engine skeleton only — LLM path not yet wired.
+    1. Rule engine check - fires immediately for red-flag keywords (no LLM call)
+    2. LLM call with structured JSON output - one retry on invalid output
+    3. Return None on persistent failure - caller shows manual dropdowns
 
-    Full pipeline (Phase 3):
-      1. Rule engine check → return immediately if red-flag match
-      2. LLM call (structured JSON schema output)
-      3. Validate output (membership check + confidence clamp)
-      4. Retry once on invalid output
-      5. Return None (fallback to manual) on persistent failure
-
-    Returns:
-        TriageSuggestion if analysis succeeded (either path)
-        None if analysis failed — caller shows manual dropdowns
+    The call_llm import is inside this function so that tests can patch
+    app.services.triage_service.call_llm cleanly.
     """
-    # Step 1: Rule engine — always runs first, even in Phase 0
+    from app.services.llm_client import call_llm
+
     result = _rule_engine_check(symptoms_text)
-    if result:
+    if result is not None:
         return result
 
-    # Phase 3: LLM call + validation + retry + fallback will go here
-    # For now, return None so the caller falls back to manual entry
+    for attempt in range(2):
+        raw = await call_llm(symptoms_text)
+
+        if raw is None:
+            break  # network/timeout - no point retrying
+
+        suggestion = validate_llm_output(raw)
+        if suggestion is not None:
+            return suggestion
+
     return None

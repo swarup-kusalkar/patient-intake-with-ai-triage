@@ -1,6 +1,7 @@
 import os
 
 import pytest
+from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -8,8 +9,16 @@ from app.main import app
 from app.models.base import Base
 
 
+@pytest.fixture(scope="module")
+def sync_client() -> TestClient:
+    """Synchronous TestClient — used by test_health.py (sync tests)."""
+    with TestClient(app, raise_server_exceptions=True) as tc:
+        yield tc
+
+
 @pytest.fixture
 async def client():
+    """Async httpx AsyncClient — used by test_api.py (async tests)."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 

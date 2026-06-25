@@ -129,7 +129,7 @@ export interface DashboardSummary {
   total: number
   by_urgency: Record<UrgencyLevel, number>
   by_department: Record<Department, number>
-  override_rate: number
+  override_rate: number | null
 }
 
 // ---------------------------------------------------------------------------

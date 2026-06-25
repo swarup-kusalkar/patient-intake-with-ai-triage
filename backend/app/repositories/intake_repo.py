@@ -14,6 +14,11 @@ from app.models.patient import Patient
 from app.schemas.intake import IntakeCreate
 
 
+def _escape_like(s: str) -> str:
+    """Escape LIKE special characters to prevent injection into ILIKE patterns."""
+    return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 async def create_patient_and_intake(
     db: AsyncSession,
     body: IntakeCreate,
@@ -80,8 +85,9 @@ async def list_intake(
     count_query = select(func.count(IntakeRecord.id))
 
     if name:
-        query = query.join(Patient).where(Patient.name.ilike(f"%{name}%"))
-        count_query = count_query.join(Patient).where(Patient.name.ilike(f"%{name}%"))
+        escaped = _escape_like(name)
+        query = query.join(Patient).where(Patient.name.ilike(f"%{escaped}%"))
+        count_query = count_query.join(Patient).where(Patient.name.ilike(f"%{escaped}%"))
 
     if date_from is not None:
         start, _ = day_range(date_from)
