@@ -1,0 +1,132 @@
+/* =============================================================
+   index.css — Global styles and CSS design tokens
+   
+   Design token system:
+   - All urgency colors defined here as CSS custom properties
+   - Used consistently across all components — never hardcode colors
+   - This is the single source of truth for the urgency color palette
+   ============================================================= */
+
+/* --- Google Fonts (loaded in index.html) --- */
+:root {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* -------------------------------------------------------------------
+   Urgency color tokens
+   Referenced by badge components, stat cards, table row highlights
+   ------------------------------------------------------------------- */
+:root {
+  /* Routine — green (lowest severity) */
+  --urgency-routine:        #22c55e;
+  --urgency-routine-bg:     #f0fdf4;
+  --urgency-routine-border: #bbf7d0;
+  --urgency-routine-text:   #15803d;
+
+  /* Priority — amber (medium severity) */
+  --urgency-priority:        #f59e0b;
+  --urgency-priority-bg:     #fffbeb;
+  --urgency-priority-border: #fde68a;
+  --urgency-priority-text:   #92400e;
+
+  /* Urgent — red (highest severity) */
+  --urgency-urgent:        #ef4444;
+  --urgency-urgent-bg:     #fef2f2;
+  --urgency-urgent-border: #fecaca;
+  --urgency-urgent-text:   #991b1b;
+
+  /* -------------------------------------------------------------------
+     Base color palette
+     ------------------------------------------------------------------- */
+  --color-primary:          #3b82f6;
+  --color-primary-hover:    #2563eb;
+  --color-primary-bg:       #eff6ff;
+
+  --color-border:           #e2e8f0;
+  --color-border-strong:    #cbd5e1;
+
+  --color-surface:          #ffffff;
+  --color-surface-raised:   #f8fafc;
+  --color-surface-overlay:  rgba(0, 0, 0, 0.4);
+
+  --color-text:             #0f172a;
+  --color-text-secondary:   #475569;
+  --color-text-muted:       #64748b;
+  --color-text-disabled:    #94a3b8;
+
+  --color-success:          #22c55e;
+  --color-error:            #ef4444;
+  --color-warning:          #f59e0b;
+
+  /* -------------------------------------------------------------------
+     Layout
+     ------------------------------------------------------------------- */
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-full: 9999px;
+
+  --shadow-sm:   0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md:   0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg:   0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl:   0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+}
+
+/* -------------------------------------------------------------------
+   CSS Reset
+   ------------------------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  line-height: 1.5;
+  tab-size: 4;
+}
+
+body {
+  background-color: var(--color-surface-raised);
+  color: var(--color-text);
+  min-height: 100vh;
+}
+
+img,
+svg,
+video,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+input,
+button,
+textarea,
+select {
+  font: inherit;
+}
+
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  overflow-wrap: break-word;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}

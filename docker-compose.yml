@@ -1,0 +1,78 @@
+services:
+  # ============================================================
+  # PostgreSQL 16
+  # ============================================================
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: patient_intake
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Init script runs ONCE on first container creation.
+      # Enables pg_trgm (GIN index) and uuid-ossp extensions.
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d patient_intake"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ============================================================
+  # FastAPI Backend
+  # ============================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # Critical: wait for DB healthcheck before starting.
+    # Without this, backend starts, tries to connect, crashes
+    # before Alembic can run migrations.
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/patient_intake}
+      LLM_API_KEY: ${LLM_API_KEY:-sk-placeholder}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-15}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-150}
+      CORS_ORIGINS_RAW: ${CORS_ORIGINS_RAW:-http://localhost:3000}
+      TRIAGE_RATE_LIMIT: ${TRIAGE_RATE_LIMIT:-10/minute}
+      DEBUG: ${DEBUG:-false}
+    volumes:
+      # Dev hot-reload: mount source into container
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ============================================================
+  # React / Vite Frontend (served by nginx in prod)
+  # ============================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # Soft dependency — just ordering, not healthcheck gating.
+    # Frontend is static; it calls the backend at runtime via /api proxy.
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
+# Named volume — persists Postgres data across docker-compose restarts
+volumes:
+  postgres_data:

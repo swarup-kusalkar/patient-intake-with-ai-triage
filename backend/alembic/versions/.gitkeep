@@ -1,0 +1,2 @@
+# This file keeps the alembic/versions/ directory tracked by git.
+# Actual migration files are added starting in Phase 1.
