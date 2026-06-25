@@ -130,3 +130,10 @@ h6 {
   display: flex;
   flex-direction: column;
 }
+
+/* Spinner animation for the Analyze button loading state */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

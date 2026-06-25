@@ -29,6 +29,7 @@ class IntakeCreate(BaseModel):
 
 class IntakeOut(BaseModel):
     id: uuid.UUID
+    patient_id: uuid.UUID
     patient: PatientOut
     symptoms_text: str
     triage_source: TriageSource | None

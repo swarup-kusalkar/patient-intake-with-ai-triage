@@ -126,9 +126,20 @@ export interface IntakeListFilters {
 // ---------------------------------------------------------------------------
 
 export interface DashboardSummary {
+  date: string
   total: number
-  by_urgency: Record<UrgencyLevel, number>
-  by_department: Record<Department, number>
+  by_urgency: { routine: number; priority: number; urgent: number }
+  by_department: {
+    general_medicine: number
+    cardiology: number
+    neurology: number
+    orthopedics: number
+    dermatology: number
+    ent: number
+    pulmonology: number
+    gastroenterology: number
+    emergency: number
+  }
   override_rate: number | null
 }
 

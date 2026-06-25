@@ -219,13 +219,15 @@ async def test_list_filtered_by_department(db_session):
 
 @pytest.mark.asyncio
 async def test_list_paginated(db_session):
+    patients = []
     for i in range(7):
         p = Patient(name=f"Patient{i}", age=20 + i, gender="M", contact_number=f"555{i:04d}")
         db_session.add(p)
+        patients.append(p)
     await db_session.flush()
 
     for i in range(7):
-        r = IntakeRecord(patient_id=p.id, symptoms_text=f"Sx{i}", final_urgency=UrgencyLevel.routine, final_department=Department.general_medicine)
+        r = IntakeRecord(patient_id=patients[i].id, symptoms_text=f"Sx{i}", final_urgency=UrgencyLevel.routine, final_department=Department.general_medicine)
         db_session.add(r)
     await db_session.commit()
 
