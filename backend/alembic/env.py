@@ -57,6 +57,7 @@ def do_run_migrations(connection):
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
+        compare_type=True,
         # Compare server defaults so autogenerate catches DEFAULT changes
         compare_server_default=True,
     )

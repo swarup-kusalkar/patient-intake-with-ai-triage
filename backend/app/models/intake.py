@@ -87,13 +87,13 @@ class IntakeRecord(Base, TimestampMixin):
     # NULL = no AI suggestion exists for this record at all.
     # ------------------------------------------------------------------
     triage_source: Mapped[TriageSource | None] = mapped_column(
-        SAEnum(TriageSource, name="triage_source"), nullable=True
+        SAEnum(TriageSource, name="triage_source", create_type=False), nullable=True
     )
     ai_suggested_urgency: Mapped[UrgencyLevel | None] = mapped_column(
-        SAEnum(UrgencyLevel, name="urgency_level"), nullable=True
+        SAEnum(UrgencyLevel, name="urgency_level", create_type=False), nullable=True
     )
     ai_suggested_department: Mapped[Department | None] = mapped_column(
-        SAEnum(Department, name="department"), nullable=True
+        SAEnum(Department, name="department", create_type=False), nullable=True
     )
     # confidence: real float; clamped to [0, 1] in triage_service, enforced by DB CHECK
     ai_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -106,10 +106,10 @@ class IntakeRecord(Base, TimestampMixin):
     # What was actually saved — always required (NOT NULL)
     # ------------------------------------------------------------------
     final_urgency: Mapped[UrgencyLevel] = mapped_column(
-        SAEnum(UrgencyLevel, name="urgency_level"), nullable=False
+        SAEnum(UrgencyLevel, name="urgency_level", create_type=False), nullable=False
     )
     final_department: Mapped[Department] = mapped_column(
-        SAEnum(Department, name="department"), nullable=False
+        SAEnum(Department, name="department", create_type=False), nullable=False
     )
 
     # ------------------------------------------------------------------
