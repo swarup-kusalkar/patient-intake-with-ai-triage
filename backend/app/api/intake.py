@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
@@ -92,6 +92,5 @@ async def get_intake(
     """
     record = await intake_repo.get_intake_by_id(db, record_id)
     if record is None:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Intake record not found")
     return IntakeOut.model_validate(record)

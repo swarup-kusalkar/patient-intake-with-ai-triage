@@ -237,12 +237,14 @@ export default function IntakeFormModal({ isOpen, onClose }: IntakeFormModalProp
           message: 'AI service unavailable — please select urgency and department manually.',
           type: 'error',
         })
-      } else {
-        setToast({
-          message: 'Analysis failed — please try again or select manually.',
-          type: 'error',
-        })
+        setAiSuggestion(null)
+        setIsLowConfidence(false)
+        return
       }
+      setToast({
+        message: 'Analysis failed — please try again or select manually.',
+        type: 'error',
+      })
       setAiSuggestion(null)
       setIsLowConfidence(false)
     }
