@@ -17,7 +17,7 @@ from __future__ import annotations
 import enum
 import uuid
 
-from sqlalchemy import Boolean, CheckConstraint, Float, ForeignKey, String, Text
+from sqlalchemy import Boolean, CheckConstraint, Float, ForeignKey, String, Text, Index
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -125,6 +125,9 @@ class IntakeRecord(Base, TimestampMixin):
     department_overridden: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     __table_args__ = (
+        Index("idx_intake_created_at", "created_at"),
+        Index("idx_intake_urgency", "final_urgency"),
+        Index("idx_intake_department", "final_department"),
         CheckConstraint(
             "ai_confidence IS NULL OR (ai_confidence >= 0 AND ai_confidence <= 1)",
             name="ck_confidence_range",

@@ -21,10 +21,26 @@ class Settings(BaseSettings):
     )
 
     # ------------------------------------------------------------------
-    # LLM / OpenAI
+    # LLM — Hybrid: Groq (primary) + Google Gemini Flash (fallback)
     # ------------------------------------------------------------------
-    llm_api_key: str = "your-api-key-here"
-    llm_model: str = "gpt-4o-mini"
+    # Primary provider: "groq" or "gemini"
+    # Recommended: Use Groq as primary (fastest, 30 RPM free), Gemini as fallback
+    llm_primary_provider: str = "groq"
+    
+    # Groq settings (primary — fastest inference)
+    groq_api_key: str = "your-groq-api-key-here"
+    groq_model: str = "llama-3.1-70b-versatile"  # or "llama-3.2-3b-preview" for speed
+    groq_timeout_seconds: int = 15
+    groq_max_tokens: int = 150
+    
+    # Google Gemini Flash settings (fallback)
+    gemini_api_key: str = "your-gemini-api-key-here"
+    gemini_model: str = "gemini-2.0-flash-exp"  # or "gemini-1.5-flash" for stability
+    gemini_max_tokens: int = 150
+    
+    # Legacy aliases for backward compatibility
+    llm_api_key: str = "your-groq-api-key-here"
+    llm_model: str = "llama-3.1-70b-versatile"
     llm_timeout_seconds: int = 15
     llm_max_tokens: int = 150
 

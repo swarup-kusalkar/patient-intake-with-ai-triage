@@ -181,10 +181,12 @@ export default function IntakeFormModal({ isOpen, onClose }: IntakeFormModalProp
     watch,
     reset,
     setValue,
-    formState: { errors },
+    trigger,
+    formState: { errors, isValid },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     mode: 'onChange',
+    reValidateMode: 'onChange',
     defaultValues: {
       name: '',
       age: undefined,
@@ -206,15 +208,17 @@ export default function IntakeFormModal({ isOpen, onClose }: IntakeFormModalProp
   const gender = watch('gender')
   const contact_number = watch('contact_number')
 
+  // Check if form is valid (no errors) AND all required fields have values
   const canSave =
+    isValid &&
     Boolean(name) &&
-    age !== undefined &&
-    age !== null &&
+    typeof age === 'number' && age > 0 &&
     Boolean(gender) &&
     Boolean(contact_number) &&
     symptomsText.length >= 10 &&
     Boolean(finalUrgency) &&
     Boolean(finalDepartment)
+
 
   // -------------------------------------------------------------------------
   // Analyze — POST /triage/analyze → pre-fill urgency/department
@@ -227,11 +231,12 @@ export default function IntakeFormModal({ isOpen, onClose }: IntakeFormModalProp
     try {
       const result = await analyzeMutation.mutateAsync({ symptoms_text: symptoms })
       setAiSuggestion(result)
-      setValue('final_urgency', result.urgency, { shouldValidate: true })
-      setValue('final_department', result.department, { shouldValidate: true })
+      setValue('final_urgency', result.urgency, { shouldValidate: true, shouldDirty: true })
+      setValue('final_department', result.department, { shouldValidate: true, shouldDirty: true })
       setIsLowConfidence(result.confidence !== null && result.confidence < 0.5)
     } catch (err: unknown) {
-      const apiErr = err as { status?: number }
+      console.error('Analysis error:', err)
+      const apiErr = err as { status?: number; message?: string }
       if (apiErr.status === 503) {
         setToast({
           message: 'AI service unavailable — please select urgency and department manually.',
@@ -242,7 +247,7 @@ export default function IntakeFormModal({ isOpen, onClose }: IntakeFormModalProp
         return
       }
       setToast({
-        message: 'Analysis failed — please try again or select manually.',
+        message: `Analysis failed: ${apiErr.message || 'Please try again or select manually'}.`,
         type: 'error',
       })
       setAiSuggestion(null)
@@ -644,12 +649,13 @@ const inputBaseStyle = {
   transition: 'border-color 0.15s',
 }
 
-function Input({
-  hasError,
-  ...props
-}: React.InputHTMLAttributes<HTMLInputElement> & { hasError?: boolean }) {
+const Input = React.forwardRef<
+  HTMLInputElement,
+  React.InputHTMLAttributes<HTMLInputElement> & { hasError?: boolean }
+>(({ hasError, ...props }, ref) => {
   return (
     <input
+      ref={ref}
       {...props}
       style={{
         ...inputBaseStyle,
@@ -657,7 +663,8 @@ function Input({
       }}
     />
   )
-}
+})
+Input.displayName = 'Input'
 
 function ErrorMsg({ children }: { children: ReactNode }) {
   return (

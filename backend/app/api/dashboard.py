@@ -34,4 +34,4 @@ async def get_dashboard_summary(
     """
     d = parse_date_param(date)
     result = await dashboard_repo.get_dashboard_summary(db, d)
-    return DashboardSummary(**result)
+    return result

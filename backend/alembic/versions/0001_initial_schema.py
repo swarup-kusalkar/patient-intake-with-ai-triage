@@ -27,14 +27,33 @@ def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
     op.execute("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"")
 
-    # 2. ENUM types (must exist before tables that reference them)
-    sa.Enum("routine", "priority", "urgent", name="urgency_level").create(op.get_bind(), checkfirst=False)
-    sa.Enum(
-        "general_medicine", "cardiology", "neurology", "orthopedics",
-        "dermatology", "ent", "pulmonology", "gastroenterology", "emergency",
-        name="department",
-    ).create(op.get_bind(), checkfirst=False)
-    sa.Enum("rule_engine", "llm", "manual", name="triage_source").create(op.get_bind(), checkfirst=False)
+    # 2. ENUM types (idempotent - safe to re-run)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE urgency_level AS ENUM ('routine', 'priority', 'urgent');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
+    
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE department AS ENUM (
+                'general_medicine', 'cardiology', 'neurology', 'orthopedics',
+                'dermatology', 'ent', 'pulmonology', 'gastroenterology', 'emergency'
+            );
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
+    
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE triage_source AS ENUM ('rule_engine', 'llm', 'manual');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
 
     # 3. patients table
     op.create_table(
@@ -55,44 +74,14 @@ def upgrade() -> None:
         sa.Column("id", sa.UUID(), server_default=sa.text("gen_random_uuid()"), nullable=False),
         sa.Column("patient_id", sa.UUID(), nullable=False),
         sa.Column("symptoms_text", sa.Text(), nullable=False),
-        sa.Column(
-            "triage_source",
-            sa.Enum("rule_engine", "llm", "manual", name="triage_source", create_type=False),
-            nullable=True,
-        ),
-        sa.Column(
-            "ai_suggested_urgency",
-            sa.Enum("routine", "priority", "urgent", name="urgency_level", create_type=False),
-            nullable=True,
-        ),
-        sa.Column(
-            "ai_suggested_department",
-            sa.Enum(
-                "general_medicine", "cardiology", "neurology", "orthopedics",
-                "dermatology", "ent", "pulmonology", "gastroenterology", "emergency",
-                name="department",
-                create_type=False,
-            ),
-            nullable=True,
-        ),
+        sa.Column("triage_source", sa.String(20), nullable=True),
+        sa.Column("ai_suggested_urgency", sa.String(20), nullable=True),
+        sa.Column("ai_suggested_department", sa.String(50), nullable=True),
         sa.Column("ai_confidence", sa.Float(), nullable=True),
         sa.Column("ai_reasoning", sa.String(220), nullable=True),
         sa.Column("ai_raw_response", JSONB(), nullable=True),
-        sa.Column(
-            "final_urgency",
-            sa.Enum("routine", "priority", "urgent", name="urgency_level", create_type=False),
-            nullable=False,
-        ),
-        sa.Column(
-            "final_department",
-            sa.Enum(
-                "general_medicine", "cardiology", "neurology", "orthopedics",
-                "dermatology", "ent", "pulmonology", "gastroenterology", "emergency",
-                name="department",
-                create_type=False,
-            ),
-            nullable=False,
-        ),
+        sa.Column("final_urgency", sa.String(20), nullable=False),
+        sa.Column("final_department", sa.String(50), nullable=False),
         sa.Column("urgency_overridden", sa.Boolean(), nullable=True),
         sa.Column("department_overridden", sa.Boolean(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
@@ -102,6 +91,23 @@ def upgrade() -> None:
             name="ck_confidence_range",
         ),
         sa.CheckConstraint("char_length(symptoms_text) <= 2000", name="ck_symptoms_length"),
+        sa.CheckConstraint("final_urgency IN ('routine', 'priority', 'urgent')", name="ck_final_urgency"),
+        sa.CheckConstraint(
+            "final_department IN ('general_medicine', 'cardiology', 'neurology', 'orthopedics', 'dermatology', 'ent', 'pulmonology', 'gastroenterology', 'emergency')",
+            name="ck_final_department",
+        ),
+        sa.CheckConstraint(
+            "triage_source IN ('rule_engine', 'llm', 'manual')",
+            name="ck_triage_source",
+        ),
+        sa.CheckConstraint(
+            "ai_suggested_urgency IN ('routine', 'priority', 'urgent')",
+            name="ck_ai_suggested_urgency",
+        ),
+        sa.CheckConstraint(
+            "ai_suggested_department IN ('general_medicine', 'cardiology', 'neurology', 'orthopedics', 'dermatology', 'ent', 'pulmonology', 'gastroenterology', 'emergency')",
+            name="ck_ai_suggested_department",
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
 

@@ -1,7 +1,5 @@
 """app/api/triage.py — Triage analyze endpoint."""
-from __future__ import annotations
-
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Body
 
 from app.core.config import settings
 from app.core.limiter import limiter
@@ -19,7 +17,7 @@ router = APIRouter(prefix="/triage", tags=["triage"])
 @limiter.limit(settings.triage_rate_limit)
 async def analyze_symptoms(
     request: Request,
-    body: TriageAnalyzeRequest,
+    body: TriageAnalyzeRequest = Body(...),
 ) -> TriageAnalyzeResponse:
     suggestion = await triage_service.analyze(body.symptoms_text)
 

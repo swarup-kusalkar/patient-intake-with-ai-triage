@@ -86,6 +86,7 @@ export interface IntakeCreate {
 export interface IntakeOut {
   id: string
   patient_id: string
+  patient: PatientOut
   symptoms_text: string
   triage_source: TriageSource | null
   ai_suggested_urgency: UrgencyLevel | null
