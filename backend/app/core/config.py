@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # LLM / OpenAI
     # ------------------------------------------------------------------
-    llm_api_key: str = "sk-placeholder"
+    llm_api_key: str = "your-api-key-here"
     llm_model: str = "gpt-4o-mini"
     llm_timeout_seconds: int = 15
     llm_max_tokens: int = 150

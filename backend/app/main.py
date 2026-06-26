@@ -15,6 +15,7 @@ from app.core.config import settings
 from app.core.db import engine
 from app.core.limiter import limiter
 from app.core.logging_middleware import AccessLogMiddleware
+from app.core.security_headers import SecurityHeadersMiddleware
 from app.models.base import Base
 from app.api import meta, triage, intake, dashboard
 
@@ -124,6 +125,7 @@ app.include_router(triage.router, prefix=API_PREFIX)
 app.include_router(intake.router, prefix=API_PREFIX)
 app.include_router(dashboard.router, prefix=API_PREFIX)
 
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(AccessLogMiddleware)
 
 

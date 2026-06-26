@@ -1,7 +1,7 @@
 """app/api/triage.py — Triage analyze endpoint."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 
 from app.core.config import settings
 from app.core.limiter import limiter
