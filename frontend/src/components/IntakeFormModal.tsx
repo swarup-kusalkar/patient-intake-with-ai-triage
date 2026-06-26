@@ -17,7 +17,7 @@
  * "Accept" is implicit: leaving the pre-filled dropdown untouched = acceptance.
  * No separate Accept button.
  */
-import { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'

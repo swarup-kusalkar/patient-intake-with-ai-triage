@@ -7,7 +7,6 @@ Create/List/Get tests use repo + Pydantic validation (model attribute access).
 """
 from __future__ import annotations
 
-import datetime
 import uuid
 
 import pytest

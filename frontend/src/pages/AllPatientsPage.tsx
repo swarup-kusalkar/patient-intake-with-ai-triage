@@ -1,19 +1,24 @@
 /**
- * src/pages/AllPatientsPage.tsx — Phase 8 All Patients Page.
+ * src/pages/AllPatientsPage.tsx — Phase 8 All Patients Page + Phase 9 Patient Detail Modal.
  *
- * Features (Phase 8):
+ * Phase 8 — All Patients Page:
  * 8.1  Filter Bar — name (debounced 300ms), date range, urgency/department dropdowns, clear
  * 8.2  Results Table — Patient, Age, Gender, Urgency (badge), Department, Source, Time, Actions
  * 8.2  Pagination — prev/next + page indicator, 20 per page
  * 8.3  Empty States — no results for filters vs no patients at all
  *
- * Phase 9 (PatientDetailModal) is wired here: clicking View opens the modal.
- * The modal is currently a placeholder — URL sync is implemented separately.
+ * Phase 9 — Patient Detail Modal:
+ * 9.1  URL Sync — /patients?id=<uuid> on open, /patients on close, back button closes modal
+ * 9.1  Page load with ?id= — modal auto-opens and fetches record
+ * 9.2  Modal Content — patient info, symptoms, AI panel (if AI used), final decision, override status
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { type IntakeOut } from '../api/types'
+import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import type { IntakeOut } from '../api/types'
 import {
   useIntakeList,
+  useIntakeDetail,
   useMetaDepartments,
   useMetaUrgencyLevels,
 } from '../api/hooks'
@@ -42,12 +47,22 @@ const URGENCY_LABELS: Record<string, string> = {
 }
 
 // ---------------------------------------------------------------------------
-// Source computation (same logic as DashboardPage)
+// Source / Override status computation
 // ---------------------------------------------------------------------------
 function computeSource(record: IntakeOut): string {
   if (record.triage_source === null) return 'Manual'
   if (!record.urgency_overridden && !record.department_overridden) return 'AI accepted'
   return 'Overridden'
+}
+
+function computeOverrideLabel(record: IntakeOut): string {
+  if (record.triage_source === null) return 'Manual entry'
+  const u = record.urgency_overridden
+  const d = record.department_overridden
+  if (!u && !d) return 'AI accepted'
+  if (u && d) return 'Both overridden'
+  if (u) return 'Urgency overridden'
+  return 'Department overridden'
 }
 
 // ---------------------------------------------------------------------------
@@ -115,6 +130,47 @@ function SourceBadge({ source }: { source: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Override Status Badge
+// ---------------------------------------------------------------------------
+function OverrideStatusBadge({ label }: { label: string }) {
+  const isAccepted = label === 'AI accepted'
+  const isManual = label === 'Manual entry'
+  const color = isManual
+    ? 'var(--color-text-muted)'
+    : isAccepted
+    ? 'var(--urgency-routine-text)'
+    : 'var(--urgency-priority-text)'
+  const bg = isManual
+    ? 'var(--color-surface-raised)'
+    : isAccepted
+    ? 'var(--urgency-routine-bg)'
+    : 'var(--urgency-priority-bg)'
+  const border = isManual
+    ? 'var(--color-border)'
+    : isAccepted
+    ? 'var(--urgency-routine-border)'
+    : 'var(--urgency-priority-border)'
+
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: '4px 10px',
+        borderRadius: 'var(--radius-md)',
+        fontSize: 12,
+        fontWeight: 600,
+        color,
+        background: bg,
+        border: `1px solid ${border}`,
+      }}
+    >
+      {label}
+    </span>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Empty State
 // ---------------------------------------------------------------------------
 function EmptyState({ hasFilters }: { hasFilters: boolean }) {
@@ -147,7 +203,8 @@ function SkeletonRow() {
               height: 14,
               width: `${w * 8}px`,
               borderRadius: 4,
-              background: 'linear-gradient(90deg, var(--color-border) 25%, var(--color-surface-raised) 50%, var(--color-border) 75%)',
+              background:
+                'linear-gradient(90deg, var(--color-border) 25%, var(--color-surface-raised) 50%, var(--color-border) 75%)',
               backgroundSize: '200% 100%',
               animation: 'shimmer 1.4s ease-in-out infinite',
             }}
@@ -159,30 +216,326 @@ function SkeletonRow() {
 }
 
 // ---------------------------------------------------------------------------
+// Patient Detail Modal (Phase 9)
+// ---------------------------------------------------------------------------
+function PatientDetailModal({
+  record,
+  onClose,
+}: {
+  record: IntakeOut | null
+  onClose: () => void
+}) {
+  const overrideLabel = record ? computeOverrideLabel(record) : ''
+  const registeredAt = record
+    ? new Date(record.created_at).toLocaleString('en-US', {
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : ''
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--color-surface-overlay)',
+        backdropFilter: 'blur(2px)',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: 'var(--color-surface)',
+          borderRadius: 'var(--radius-xl)',
+          boxShadow: 'var(--shadow-xl)',
+          width: '100%',
+          maxWidth: 600,
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          margin: 16,
+        }}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '20px 24px',
+            borderBottom: '1px solid var(--color-border)',
+          }}
+        >
+          <h2
+            id="modal-title"
+            style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}
+          >
+            Patient Detail
+          </h2>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 22,
+              color: 'var(--color-text-muted)',
+              padding: 4,
+              lineHeight: 1,
+            }}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Content */}
+        {record ? (
+          <div style={{ padding: '24px' }}>
+            {/* Patient Info */}
+            <Section title="Patient Information">
+              <InfoGrid>
+                <InfoItem label="Name" value={record.patient.name} />
+                <InfoItem label="Age" value={String(record.patient.age)} />
+                <InfoItem label="Gender" value={record.patient.gender} />
+                <InfoItem label="Contact" value={record.patient.contact_number} />
+                <InfoItem
+                  label="Registered At"
+                  value={registeredAt}
+                  span
+                />
+              </InfoGrid>
+            </Section>
+
+            {/* Symptoms */}
+            <Section title="Symptoms">
+              <div
+                style={{
+                  padding: '10px 12px',
+                  background: 'var(--color-surface-raised)',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: 13,
+                  color: 'var(--color-text)',
+                  lineHeight: 1.6,
+                  whiteSpace: 'pre-wrap',
+                }}
+              >
+                {record.symptoms_text}
+              </div>
+            </Section>
+
+            {/* AI Suggestion Panel (if AI was used) */}
+            {record.triage_source !== null && (
+              <Section title="AI Suggestion">
+                <div
+                  style={{
+                    padding: '12px 16px',
+                    background: 'var(--color-surface-raised)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-md)',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: '8px 16px',
+                      marginBottom: 8,
+                    }}
+                  >
+                    <div>
+                      <div style={metaLabelStyle}>Source</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-primary)' }}>
+                        {record.triage_source === 'rule_engine' ? 'Rule Engine' : 'AI'}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={metaLabelStyle}>Suggested Urgency</div>
+                      <UrgencyBadge urgency={record.ai_suggested_urgency ?? 'routine'} />
+                    </div>
+                    <div>
+                      <div style={metaLabelStyle}>Suggested Department</div>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>
+                        {DEPT_LABELS[record.ai_suggested_department ?? 'general_medicine'] ??
+                          record.ai_suggested_department}
+                      </div>
+                    </div>
+                    {record.ai_confidence !== null && (
+                      <div>
+                        <div style={metaLabelStyle}>Confidence</div>
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>
+                          {Math.round(record.ai_confidence * 100)}%
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {record.ai_reasoning && (
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: 'var(--color-text-secondary)',
+                        fontStyle: 'italic',
+                        paddingTop: 4,
+                        borderTop: '1px solid var(--color-border)',
+                        marginTop: 4,
+                      }}
+                    >
+                      {record.ai_reasoning}
+                    </div>
+                  )}
+                </div>
+              </Section>
+            )}
+
+            {/* Final Decision */}
+            <Section title="Final Decision">
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: 12,
+                  marginBottom: 12,
+                }}
+              >
+                <div>
+                  <div style={metaLabelStyle}>Urgency</div>
+                  <UrgencyBadge urgency={record.final_urgency} />
+                </div>
+                <div>
+                  <div style={metaLabelStyle}>Department</div>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>
+                    {DEPT_LABELS[record.final_department] ?? record.final_department}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={metaLabelStyle}>Override Status</div>
+                <OverrideStatusBadge label={overrideLabel} />
+              </div>
+            </Section>
+          </div>
+        ) : (
+          <div
+            style={{
+              padding: '40px 24px',
+              textAlign: 'center',
+              color: 'var(--color-text-muted)',
+              fontSize: 13,
+            }}
+          >
+            Loading patient details...
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Section wrapper
+// ---------------------------------------------------------------------------
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          color: 'var(--color-text-muted)',
+          marginBottom: 8,
+        }}
+      >
+        {title}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+const metaLabelStyle = {
+  fontSize: 10,
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+  color: 'var(--color-text-muted)',
+  marginBottom: 2,
+}
+
+// ---------------------------------------------------------------------------
+// Info grid helper
+// ---------------------------------------------------------------------------
+function InfoGrid({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '8px 16px',
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+function InfoItem({
+  label,
+  value,
+  span,
+}: {
+  label: string
+  value: string
+  span?: boolean
+}) {
+  return (
+    <div style={span ? { gridColumn: '1 / -1' } : {}}>
+      <div style={metaLabelStyle}>{label}</div>
+      <div style={{ fontSize: 13, color: 'var(--color-text)', fontWeight: 500 }}>
+        {value}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // AllPatientsPage
 // ---------------------------------------------------------------------------
 export default function AllPatientsPage() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const selectedIdFromUrl = searchParams.get('id')
+
   // Filter state
   const [nameQuery, setNameQuery] = useState('')
   const [debouncedName, setDebouncedName] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
-  const [urgency, setUrgency] = useState<string>('')
-  const [department, setDepartment] = useState<string>('')
-
-  // Pagination (0-indexed offset internally)
+  const [urgency, setUrgency] = useState('')
+  const [department, setDepartment] = useState('')
   const [page, setPage] = useState(0)
 
-  // Modal state
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-
-  // Ref to track if this is the "no patients at all" empty state
+  // Ref: has this page ever loaded (for empty state distinction)
   const hasEverLoaded = useRef(false)
 
   // Meta
   const { data: urgencyLevels = [] } = useMetaUrgencyLevels()
   const { data: departments = [] } = useMetaDepartments()
+
+  // Fetch patient detail when URL has id
+  const { data: selectedRecord } = useIntakeDetail(selectedIdFromUrl)
 
   // Build filters for API call
   const filters = {
@@ -201,13 +554,25 @@ export default function AllPatientsPage() {
     hasEverLoaded.current = true
   }
 
-  const hasFilters = Boolean(
-    debouncedName || dateFrom || dateTo || urgency || department
-  )
-
   const totalItems = data?.total ?? 0
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE))
   const currentPage = Math.min(page + 1, totalPages)
+  const hasFilters = Boolean(debouncedName || dateFrom || dateTo || urgency || department)
+  const records = data?.items ?? []
+  const isEmpty = !isLoading && records.length === 0
+
+  // -------------------------------------------------------------------------
+  // URL sync: modal open state driven by ?id= query param
+  // -------------------------------------------------------------------------
+  const isModalOpen = selectedIdFromUrl !== null
+
+  function openPatient(id: string) {
+    navigate(`/patients?id=${id}`)
+  }
+
+  function closeModal() {
+    navigate('/patients')
+  }
 
   // -------------------------------------------------------------------------
   // Debounce name search (300ms)
@@ -215,16 +580,16 @@ export default function AllPatientsPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedName(nameQuery)
-      setPage(0) // reset to first page on filter change
+      setPage(0)
     }, 300)
     return () => clearTimeout(timer)
   }, [nameQuery])
 
-  // Reset page when other filters change
-  const handleFilterChange = useCallback((setter: () => void) => {
+  // Reset page on filter changes (non-name)
+  function handleFilterChange(setter: () => void) {
     setter()
     setPage(0)
-  }, [])
+  }
 
   // Clear all filters
   function clearFilters() {
@@ -237,21 +602,6 @@ export default function AllPatientsPage() {
     setPage(0)
   }
 
-  // Open patient detail modal
-  function openPatient(id: string) {
-    setSelectedId(id)
-    setIsModalOpen(true)
-  }
-
-  function closeModal() {
-    setIsModalOpen(false)
-    setSelectedId(null)
-  }
-
-  const records = data?.items ?? []
-  const hasRecords = records.length > 0
-  const isEmpty = !isLoading && !hasRecords
-
   return (
     <div
       style={{
@@ -261,95 +611,20 @@ export default function AllPatientsPage() {
         fontFamily: 'Inter, sans-serif',
       }}
     >
-      {/* Patient Detail Modal placeholder (Phase 9) */}
-      {isModalOpen && selectedId && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 50,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'var(--color-surface-overlay)',
-            backdropFilter: 'blur(2px)',
-          }}
-          onClick={closeModal}
-        >
-          <div
-            style={{
-              background: 'var(--color-surface)',
-              borderRadius: 'var(--radius-xl)',
-              boxShadow: 'var(--shadow-xl)',
-              width: '100%',
-              maxWidth: 560,
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              margin: 16,
-              padding: 24,
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 16,
-              }}
-            >
-              <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>
-                Patient Detail
-              </h2>
-              <button
-                onClick={closeModal}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: 22,
-                  color: 'var(--color-text-muted)',
-                  padding: 4,
-                }}
-              >
-                ×
-              </button>
-            </div>
-            <div style={{ color: 'var(--color-text-secondary)', fontSize: 13 }}>
-              Patient ID: <code style={{ fontSize: 12 }}>{selectedId}</code>
-            </div>
-            <p
-              style={{
-                marginTop: 12,
-                color: 'var(--color-text-muted)',
-                fontSize: 12,
-              }}
-            >
-              Full patient detail modal with AI suggestion display, override
-              status, and registered at timestamp — Phase 9.
-            </p>
-          </div>
-        </div>
+      {/* Patient Detail Modal (Phase 9) — driven by URL */}
+      {isModalOpen && (
+        <PatientDetailModal
+          record={selectedRecord ?? null}
+          onClose={closeModal}
+        />
       )}
 
       {/* Page Header */}
       <div style={{ marginBottom: 24 }}>
-        <h1
-          style={{
-            fontSize: 22,
-            fontWeight: 800,
-            color: 'var(--color-text)',
-            margin: 0,
-          }}
-        >
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-text)', margin: 0 }}>
           All Patients
         </h1>
-        <p
-          style={{
-            fontSize: 13,
-            color: 'var(--color-text-muted)',
-            margin: '4px 0 0',
-          }}
-        >
+        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', margin: '4px 0 0' }}>
           {totalItems > 0
             ? `${totalItems} registration${totalItems !== 1 ? 's' : ''} found`
             : 'Search and filter patient registrations'}
@@ -375,7 +650,7 @@ export default function AllPatientsPage() {
             alignItems: 'end',
           }}
         >
-          {/* Name search */}
+          {/* Name */}
           <div>
             <label style={labelStyle}>Name</label>
             <input
@@ -409,7 +684,7 @@ export default function AllPatientsPage() {
             />
           </div>
 
-          {/* Urgency filter */}
+          {/* Urgency */}
           <div>
             <label style={labelStyle}>Urgency</label>
             <select
@@ -426,7 +701,7 @@ export default function AllPatientsPage() {
             </select>
           </div>
 
-          {/* Department filter */}
+          {/* Department */}
           <div>
             <label style={labelStyle}>Department</label>
             <select
@@ -483,44 +758,23 @@ export default function AllPatientsPage() {
                   borderBottom: '1px solid var(--color-border)',
                 }}
               >
-                {[
-                  'Patient',
-                  'Age',
-                  'Gender',
-                  'Urgency',
-                  'Department',
-                  'Source',
-                  'Registered',
-                  '',
-                ].map((h) => (
-                  <th
-                    key={h}
-                    style={thStyle}
-                  >
-                    {h}
-                  </th>
-                ))}
+                {['Patient', 'Age', 'Gender', 'Urgency', 'Department', 'Source', 'Registered', ''].map(
+                  (h) => (
+                    <th key={h} style={thStyle}>
+                      {h}
+                    </th>
+                  )
+                )}
               </tr>
             </thead>
             <tbody>
               {isLoading
-                ? Array.from({ length: 5 }).map((_, i) => (
-                    <SkeletonRow key={i} />
-                  ))
+                ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
                 : isEmpty
                 ? null
                 : records.map((record) => {
                     const source = computeSource(record)
-                    const registeredDate = new Date(record.created_at)
-                    const dateStr = registeredDate.toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                    })
-                    const timeStr = registeredDate.toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })
-
+                    const reg = new Date(record.created_at)
                     return (
                       <tr
                         key={record.id}
@@ -528,7 +782,6 @@ export default function AllPatientsPage() {
                         style={{
                           cursor: 'pointer',
                           borderBottom: '1px solid var(--color-border)',
-                          transition: 'background 0.1s',
                         }}
                         onMouseEnter={(e) => {
                           ;(e.currentTarget as HTMLElement).style.background =
@@ -539,32 +792,25 @@ export default function AllPatientsPage() {
                         }}
                       >
                         <td style={tdStyle}>{record.patient.name}</td>
-                        <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          {record.patient.age}
-                        </td>
-                        <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          {record.patient.gender}
-                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'center' }}>{record.patient.age}</td>
+                        <td style={{ ...tdStyle, textAlign: 'center' }}>{record.patient.gender}</td>
                         <td style={{ ...tdStyle, textAlign: 'center' }}>
                           <UrgencyBadge urgency={record.final_urgency} />
                         </td>
                         <td style={tdStyle}>
-                          {DEPT_LABELS[record.final_department] ??
-                            record.final_department}
+                          {DEPT_LABELS[record.final_department] ?? record.final_department}
                         </td>
                         <td style={{ ...tdStyle, textAlign: 'center' }}>
                           <SourceBadge source={source} />
                         </td>
                         <td style={tdStyle}>
-                          <div>
-                            <span style={{ color: 'var(--color-text-secondary)', fontSize: 12 }}>
-                              {dateStr}
-                            </span>
-                            <br />
-                            <span style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>
-                              {timeStr}
-                            </span>
-                          </div>
+                          <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                            {reg.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </span>
+                          <br />
+                          <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                            {reg.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
                         </td>
                         <td style={{ ...tdStyle, textAlign: 'center' }}>
                           <button
@@ -594,7 +840,9 @@ export default function AllPatientsPage() {
         </div>
 
         {/* Empty state */}
-        {isEmpty && <EmptyState hasFilters={hasFilters && hasEverLoaded.current} />}
+        {isEmpty && (
+          <EmptyState hasFilters={hasFilters && hasEverLoaded.current} />
+        )}
 
         {/* Pagination */}
         {!isEmpty && (
@@ -607,24 +855,14 @@ export default function AllPatientsPage() {
               borderTop: '1px solid var(--color-border)',
             }}
           >
-            <span
-              style={{
-                fontSize: 12,
-                color: 'var(--color-text-muted)',
-              }}
-            >
+            <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
               {totalItems === 0
                 ? 'No results'
                 : `${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, totalItems)} of ${totalItems}`}
             </span>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span
-                style={{
-                  fontSize: 12,
-                  color: 'var(--color-text-muted)',
-                }}
-              >
+              <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
                 Page {currentPage} of {totalPages}
               </span>
 
