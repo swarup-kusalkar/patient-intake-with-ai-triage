@@ -10,15 +10,17 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Literal
 
-from groq import AsyncGroq, APITimeoutError, APIConnectionError
+from groq import AsyncGroq
 from google import genai
 from google.genai import types
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+# Enable debug logging when DEBUG=true
+if settings.debug:
+    logger.setLevel(logging.DEBUG)
 
 SYSTEM_PROMPT = """You are a clinical triage assistant. Classify the patient's symptoms into
 exactly one urgency level and one department.
@@ -112,18 +114,23 @@ def _parse_gemini_response(response_text: str) -> dict | None:
 async def _call_groq(symptoms_text: str) -> dict | None:
     """Call Groq LPU API (fastest inference)."""
     try:
+        # Check if API key is configured
+        if not settings.groq_api_key or settings.groq_api_key == "your-groq-api-key-here":
+            logger.error("Groq API key not configured")
+            return None
+            
         client = AsyncGroq(
             api_key=settings.groq_api_key,
             timeout=settings.groq_timeout_seconds,
         )
         
+        logger.info(f"Calling Groq API with model: {settings.groq_model}, symptoms length: {len(symptoms_text)}")
+        
+        # Use simple json_object format - more reliable than json_schema
         response = await client.chat.completions.create(
             model=settings.groq_model,
             max_tokens=settings.groq_max_tokens,
-            response_format={
-                "type": "json_schema",
-                "json_schema": TRIAGE_JSON_SCHEMA,
-            },
+            response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": symptoms_text},
@@ -131,26 +138,33 @@ async def _call_groq(symptoms_text: str) -> dict | None:
         )
         
         content = response.choices[0].message.content
+        logger.info(f"Groq response received: {content[:200] if content else 'empty'}")
         return _parse_groq_response(content)
         
     except Exception as e:
+        logger.error(f"Groq API error: {type(e).__name__}: {e}")
         # Check if it's a rate limit error
         error_str = str(e).lower()
         if "rate limit" in error_str or "quota" in error_str or "429" in error_str:
             logger.warning(f"Groq rate limit hit: {e}")
             raise  # Re-raise to trigger fallback
-        logger.error(f"Groq API error: {e}")
         return None
 
 
 async def _call_gemini(symptoms_text: str) -> dict | None:
     """Call Google Gemini Flash API (fallback)."""
     try:
-        client = genai.Client(
-            api_key=settings.gemini_api_key,
-        )
+        # Check if API key is configured
+        if not settings.gemini_api_key or settings.gemini_api_key == "your-gemini-api-key-here":
+            logger.error("Gemini API key not configured")
+            return None
+            
+        logger.info(f"Calling Gemini API with model: {settings.gemini_model}, symptoms length: {len(symptoms_text)}")
         
-        response = await client.models.generate_content_async(
+        client = genai.Client(api_key=settings.gemini_api_key)
+
+        # google-genai 1.x exposes async APIs under client.aio.models.
+        response = await client.aio.models.generate_content(
             model=settings.gemini_model,
             contents=f"{SYSTEM_PROMPT}\n\nPatient symptoms: {symptoms_text}",
             config=types.GenerateContentConfig(
@@ -160,16 +174,19 @@ async def _call_gemini(symptoms_text: str) -> dict | None:
             ),
         )
         
+        logger.info(f"Gemini response received: {response.text[:200] if response.text else 'empty'}")
+        
         if response.text:
             return _parse_gemini_response(response.text)
+        logger.warning("Gemini returned empty response")
         return None
         
     except Exception as e:
+        logger.error(f"Gemini API error: {type(e).__name__}: {e}")
         error_str = str(e).lower()
-        if "quota" in error_str or "rate limit" in error_str or "429" in error_str:
-            logger.warning(f"Gemini rate limit hit: {e}")
+        if "quota" in error_str or "rate limit" in error_str or "429" in error_str or "api key" in error_str or "authentication" in error_str:
+            logger.warning(f"Gemini error (possibly auth/rate limit): {e}")
             raise
-        logger.error(f"Gemini API error: {e}")
         return None
 
 
@@ -191,24 +208,32 @@ async def call_llm(symptoms_text: str) -> dict | None:
     """
     # Determine which provider to use based on settings
     primary_provider = settings.llm_primary_provider  # "groq" or "gemini"
+    logger.info(f"Starting LLM call with primary provider: {primary_provider}")
+    logger.info(f"Groq API key configured: {bool(settings.groq_api_key and settings.groq_api_key != 'your-groq-api-key-here')}")
+    logger.info(f"Gemini API key configured: {bool(settings.gemini_api_key and settings.gemini_api_key != 'your-gemini-api-key-here')}")
     
     try:
-        if primary_provider == "groq" and settings.groq_api_key:
+        if primary_provider == "groq" and settings.groq_api_key and settings.groq_api_key != "your-groq-api-key-here":
             logger.info("Using Groq LPU as primary LLM")
             result = await _call_groq(symptoms_text)
             if result:
+                logger.info("Groq succeeded")
                 return result
             # If we got here without exception, Groq returned None
             # Try Gemini as fallback
             logger.info("Groq returned None, trying Gemini fallback")
-            if settings.gemini_api_key:
-                return await _call_gemini(symptoms_text)
-        else:
-            # Gemini is primary or Groq key not available
-            logger.info("Using Gemini Flash as primary LLM")
-            if settings.gemini_api_key:
+            if settings.gemini_api_key and settings.gemini_api_key != "your-gemini-api-key-here":
                 result = await _call_gemini(symptoms_text)
                 if result:
+                    logger.info("Gemini fallback succeeded")
+                    return result
+        else:
+            # Gemini is primary or Groq key not available
+            logger.info("Using Gemini Flash as primary LLM (Groq not configured or not primary)")
+            if settings.gemini_api_key and settings.gemini_api_key != "your-gemini-api-key-here":
+                result = await _call_gemini(symptoms_text)
+                if result:
+                    logger.info("Gemini succeeded")
                     return result
         
         # All providers failed
@@ -217,16 +242,17 @@ async def call_llm(symptoms_text: str) -> dict | None:
         
     except Exception as e:
         # Groq raised rate limit exception, try Gemini
+        logger.error(f"LLM call exception: {type(e).__name__}: {e}")
         if "rate limit" in str(e).lower() or "quota" in str(e).lower() or "429" in str(e):
-            logger.warning("Groq rate limit hit, falling back to Gemini Flash")
-            if settings.gemini_api_key:
+            logger.warning("Primary provider rate limit hit, falling back to secondary")
+            if settings.gemini_api_key and settings.gemini_api_key != "your-gemini-api-key-here":
                 try:
                     result = await _call_gemini(symptoms_text)
                     if result:
-                        logger.info("Gemini fallback succeeded")
+                        logger.info("Fallback succeeded")
                         return result
                 except Exception as gemini_error:
-                    logger.error(f"Gemini fallback also failed: {gemini_error}")
+                    logger.error(f"Fallback also failed: {type(gemini_error).__name__}: {gemini_error}")
         
         logger.error(f"All LLM providers failed: {e}")
         return None

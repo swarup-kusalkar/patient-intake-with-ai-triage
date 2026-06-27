@@ -16,9 +16,8 @@
 1. Go to: https://aistudio.google.com/app/apikey
 2. Sign in with Google account
 3. Click **"Create API Key"**
-4. Copy the key (starts with `AIza...`)
+4. Copy the key (should start with `AIza...` or be a long alphanumeric string)
 5. **Free tier:** 15 requests/minute, 1M tokens/month
-
 ### 2. Configure .env File
 
 ```bash

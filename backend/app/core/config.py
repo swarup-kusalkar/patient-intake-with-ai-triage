@@ -7,6 +7,7 @@ Uses @lru_cache so settings are read once at startup, not on every import.
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from typing import List
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -29,13 +30,13 @@ class Settings(BaseSettings):
     
     # Groq settings (primary — fastest inference)
     groq_api_key: str = "your-groq-api-key-here"
-    groq_model: str = "llama-3.1-70b-versatile"  # or "llama-3.2-3b-preview" for speed
+    groq_model: str = "llama-3.3-70b-versatile"  # or "llama-3.1-8b-instant" for speed
     groq_timeout_seconds: int = 15
     groq_max_tokens: int = 150
     
-    # Google Gemini Flash settings (fallback)
+# Google Gemini Flash settings (fallback)
     gemini_api_key: str = "your-gemini-api-key-here"
-    gemini_model: str = "gemini-2.0-flash-exp"  # or "gemini-1.5-flash" for stability
+    gemini_model: str = "gemini-2.0-flash"  # or "gemini-1.5-flash" for stability
     gemini_max_tokens: int = 150
     
     # Legacy aliases for backward compatibility
@@ -65,8 +66,15 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     debug: bool = False
 
+    _backend_dir = Path(__file__).resolve().parents[2]
+    _repo_root_dir = _backend_dir.parent
+
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(
+            ".env",
+            _backend_dir / ".env",
+            _repo_root_dir / ".env",
+        ),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",

@@ -100,12 +100,12 @@ async def list_intake(
         count_query = count_query.where(IntakeRecord.created_at < end)
 
     if urgency:
-        query = query.where(IntakeRecord.final_urgency == urgency)
-        count_query = count_query.where(IntakeRecord.final_urgency == urgency)
+        query = query.where(IntakeRecord.final_urgency == urgency.value)
+        count_query = count_query.where(IntakeRecord.final_urgency == urgency.value)
 
     if department:
-        query = query.where(IntakeRecord.final_department == department)
-        count_query = count_query.where(IntakeRecord.final_department == department)
+        query = query.where(IntakeRecord.final_department == department.value)
+        count_query = count_query.where(IntakeRecord.final_department == department.value)
 
     count_result = await db.execute(count_query)
     total = count_result.scalar() or 0

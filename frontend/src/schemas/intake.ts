@@ -41,7 +41,7 @@ export const patientSchema = z.object({
 
   contact_number: z
     .string()
-    .min(1, 'Contact number is required'),
+    .regex(/^\d{10}$/, 'Contact number must be exactly 10 digits'),
 })
 
 // ---------------------------------------------------------------------------

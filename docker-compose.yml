@@ -41,11 +41,11 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/patient_intake}
       LLM_PRIMARY_PROVIDER: ${LLM_PRIMARY_PROVIDER:-groq}
       GROQ_API_KEY: ${GROQ_API_KEY:-your-groq-api-key-here}
-      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-70b-versatile}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
       GROQ_TIMEOUT_SECONDS: ${GROQ_TIMEOUT_SECONDS:-15}
       GROQ_MAX_TOKENS: ${GROQ_MAX_TOKENS:-150}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-your-gemini-api-key-here}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash-exp}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
       GEMINI_MAX_TOKENS: ${GEMINI_MAX_TOKENS:-150}
       LLM_API_KEY: ${LLM_API_KEY:-sk-placeholder}
       LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}

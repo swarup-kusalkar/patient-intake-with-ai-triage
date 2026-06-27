@@ -18,7 +18,6 @@ import enum
 import uuid
 
 from sqlalchemy import Boolean, CheckConstraint, Float, ForeignKey, String, Text, Index
-from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -89,13 +88,13 @@ class IntakeRecord(Base, TimestampMixin):
     # NULL = no AI suggestion exists for this record at all.
     # ------------------------------------------------------------------
     triage_source: Mapped[TriageSource | None] = mapped_column(
-        SAEnum(TriageSource, name="triage_source", create_type=False), nullable=True
+        String(20), nullable=True
     )
     ai_suggested_urgency: Mapped[UrgencyLevel | None] = mapped_column(
-        SAEnum(UrgencyLevel, name="urgency_level", create_type=False), nullable=True
+        String(20), nullable=True
     )
     ai_suggested_department: Mapped[Department | None] = mapped_column(
-        SAEnum(Department, name="department", create_type=False), nullable=True
+        String(50), nullable=True
     )
     # confidence: real float; clamped to [0, 1] in triage_service, enforced by DB CHECK
     ai_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -108,10 +107,10 @@ class IntakeRecord(Base, TimestampMixin):
     # What was actually saved — always required (NOT NULL)
     # ------------------------------------------------------------------
     final_urgency: Mapped[UrgencyLevel] = mapped_column(
-        SAEnum(UrgencyLevel, name="urgency_level", create_type=False), nullable=False
+        String(20), nullable=False
     )
     final_department: Mapped[Department] = mapped_column(
-        SAEnum(Department, name="department", create_type=False), nullable=False
+        String(50), nullable=False
     )
 
     # ------------------------------------------------------------------

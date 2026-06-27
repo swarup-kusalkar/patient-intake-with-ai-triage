@@ -29,14 +29,14 @@ async def get_dashboard_summary(
         .where(IntakeRecord.created_at >= start, IntakeRecord.created_at < end)
         .group_by(IntakeRecord.final_urgency)
     )
-    by_urgency = {u.value: c for u, c in urgency_result.all()}
+    by_urgency = {u: c for u, c in urgency_result.all()}
 
     dept_result = await db.execute(
         select(IntakeRecord.final_department, func.count(IntakeRecord.id))
         .where(IntakeRecord.created_at >= start, IntakeRecord.created_at < end)
         .group_by(IntakeRecord.final_department)
     )
-    by_department = {d.value: c for d, c in dept_result.all()}
+    by_department = {d: c for d, c in dept_result.all()}
 
     ai_used_result = await db.execute(
         select(func.count(IntakeRecord.id)).where(

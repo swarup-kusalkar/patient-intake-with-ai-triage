@@ -67,6 +67,8 @@ const DEPT_LABELS: Record<string, string> = {
   emergency: 'Emergency',
 }
 
+const GENDER_OPTIONS = ['Male', 'Female', 'Other'] as const
+
 // ---------------------------------------------------------------------------
 // Toast notification
 // ---------------------------------------------------------------------------
@@ -432,16 +434,35 @@ export default function IntakeFormModal({ isOpen, onClose }: IntakeFormModalProp
           {/* Patient fields — row 2 */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
             <FieldWrap label="Gender *" error={errors.gender?.message}>
-              <Input
+              <select
                 {...register('gender')}
-                placeholder="M / F / Other"
-                hasError={Boolean(errors.gender)}
-              />
+                defaultValue=""
+                style={{
+                  ...inputBaseStyle,
+                  cursor: 'pointer',
+                  borderColor: errors.gender ? 'var(--urgency-urgent)' : 'var(--color-border)',
+                }}
+              >
+                <option value="">Select gender...</option>
+                {GENDER_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
             </FieldWrap>
             <FieldWrap label="Contact Number *" error={errors.contact_number?.message}>
               <Input
-                {...register('contact_number')}
-                placeholder="Phone number"
+                {...register('contact_number', {
+                  onChange: (event) => {
+                    const digitsOnly = event.target.value.replace(/\D/g, '').slice(0, 10)
+                    event.target.value = digitsOnly
+                  },
+                })}
+                type="text"
+                inputMode="numeric"
+                maxLength={10}
+                placeholder="10-digit number"
                 hasError={Boolean(errors.contact_number)}
               />
             </FieldWrap>
