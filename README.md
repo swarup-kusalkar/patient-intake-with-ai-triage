@@ -113,11 +113,7 @@ docker-compose up
 # - Backend to start (healthcheck passes)
 # - Frontend nginx to serve static assets
 
-# 4. (Optional) Seed database with 15 synthetic patients
-# This makes dashboard charts visually meaningful on first load
-docker-compose exec backend python scripts/seed_data.py
-
-# 5. Open the application
+# 4. Open the application
 # Frontend:  http://localhost:3000
 # API docs:  http://localhost:8000/docs
 # Health:    http://localhost:8000/health
@@ -145,7 +141,7 @@ with **Google Gemini Flash** as fallback when rate limits are hit. This ensures:
    - Model: `gemini-2.0-flash-exp` (latest) or `gemini-1.5-flash` (stable)
    - Sign up with Google account, instant key
 
-### Verify It Works
+### Working
 
 1. **Dashboard** loads with today's stats (empty initially)
 2. Click **"Register Patient"** → form modal opens
@@ -153,26 +149,6 @@ with **Google Gemini Flash** as fallback when rate limits are hit. This ensures:
 4. Click **"Analyze"** → AI suggests urgency/department
 5. Accept or override → click **"Save"**
 6. Dashboard refreshes; patient appears in mini-table
-
-### Seed Data (Optional)
-
-To populate the database with 15 synthetic patients for demo purposes:
-
-```bash
-docker-compose exec backend python scripts/seed_data.py
-```
-
-This creates patients covering all four override scenarios:
-- **Manual** (3 patients): No AI involvement
-- **AI Accepted** (4 patients): Receptionist agrees with AI suggestion
-- **Fully Overridden** (3 patients): Both urgency and department changed
-- **Partially Overridden** (5 patients): One field changed, one accepted
-
-After seeding, the dashboard will show:
-- Meaningful urgency distribution chart (routine/priority/urgent)
-- Department breakdown across all 9 specialties
-- Source column showing Manual/AI Accepted/Overridden mix
-- Recent patients table with varied cases
 
 ### Stop & Reset
 
