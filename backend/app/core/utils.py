@@ -1,5 +1,6 @@
 from datetime import date, datetime, time, timezone, timedelta
-
+from zoneinfo import ZoneInfo
+CLINIC_TZ = ZoneInfo("Asia/Kolkata")
 
 def parse_date_param(date_str: str) -> date:
     if date_str.strip().lower() == "today":
@@ -8,6 +9,6 @@ def parse_date_param(date_str: str) -> date:
 
 
 def day_range(d: date) -> tuple[datetime, datetime]:
-    start = datetime.combine(d, time.min, tzinfo=timezone.utc)
+    start = datetime.combine(d, time.min, tzinfo=CLINIC_TZ)
     end = start + timedelta(days=1)
     return start, end

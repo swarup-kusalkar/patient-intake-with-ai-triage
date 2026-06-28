@@ -25,7 +25,7 @@ from pathlib import Path
 # Add parent directory to path so we can import app modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from app.models.base import Base
 from app.models.patient import Patient
 from app.models.intake import IntakeRecord, UrgencyLevel, Department, TriageSource
@@ -274,7 +274,7 @@ async def seed_database():
     
     # Create async engine and session
     engine = create_async_engine(database_url, echo=False)
-    session_factory = async_sessionmaker(bind=engine, class_=type("AsyncSession", (), {}), expire_on_commit=False)
+    session_factory = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
     
     try:
         # Create tables if they don't exist
